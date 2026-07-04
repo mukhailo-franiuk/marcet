@@ -1,12 +1,15 @@
 import { defineConfig } from '@prisma/config';
+import * as dotenv from 'dotenv';
+
+// 🔥 Явно завантажуємо змінні оточення з файлу .env для Prisma CLI
+dotenv.config();
 
 export default defineConfig({
-  // 🔥 Передаємо шлях до схеми як звичайний рядок. Це виправляє помилку TypeScript.
   schema: 'prisma/schema.prisma',
-  
-  // Переносимо підключення для міграцій CLI та Prisma Studio
   datasource: {
+    // Тепер process.env гарантовано міститиме ваші рядки підключення Neon
     url: process.env.DIRECT_URL || process.env.DATABASE_URL,
   },
 });
+
 

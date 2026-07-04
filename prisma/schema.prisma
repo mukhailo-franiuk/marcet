@@ -87,8 +87,8 @@ model Product {
   id            String        @id @default(cuid())
   title         String
   description   String
-  image         Bytes         // 🔥 Зберігаємо головне зображення як бінарні дані (BLOB)
-  images        Bytes[]       // 🔥 Галерея додаткових фото як масив BLOB
+  image         String        // 🔥 Перевірте, щоб тут було String, а не Bytes
+  images        String[]      // 🔥 Перевірте, щоб тут було String[], а не Bytes[]
   price         Float         
   oldPrice      Float?        
   discount      Int?          
@@ -111,6 +111,7 @@ model Product {
   @@index([sellerId])
   @@index([categoryId])
 }
+
 
 
 // -------------------------------------------------------------
