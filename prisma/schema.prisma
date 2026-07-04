@@ -1,0 +1,219 @@
+datasource db {
+  provider = "postgresql"
+  // ❌ Рядки url та directUrl звідси видалено, інакше Prisma 7 викидає P1012
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ... Ваші моделі (User, Product, SellerProfile тощо) залишаються без змін
+
+
+// -------------------------------------------------------------
+// 1. АВТОРИЗАЦІЯ ТА РОЛІ (Сумісно з NextAuth / Auth.js)
+// -------------------------------------------------------------
+
+enum Role {
+  CUSTOMER  // Покупець
+  SELLER    // Продавець / Мерчант
+  ADMIN     // Супер-адміністратор платформи
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?   // Для стандартної авторизації email/password
+  image         String?   // Аватар користувача
+  role          Role      @default(CUSTOMER)
+  isActive      Boolean   @default(true) // Адмін може забанити юзера
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Зв'язки 1-до-1 для розширених профілів
+  sellerProfile SellerProfile? 
+  adminProfile  AdminProfile?
+
+  // Зв'язки покупця
+  orders        Order[]
+  reviews       Review[]
+  wishlist      WishlistItem[]
+}
+
+// Профіль продавця (Мерчанта)
+model SellerProfile {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  storeName       String        @unique // Назва магазину
+  storeSlug       String        @unique // Для URL: ://mercora.com
+  logo            String?
+  banner          String?
+  description     String?
+  phone           String
+  isVerified      Boolean       @default(false) // Верифікація адміном перед допуском товарів
+  balance         Float         @default(0.0)   // Баланс для виплат заробітку
+  
+  products        Product[]     // Товари цього продавця
+  payouts         Payout[]      // Запити на виведення коштів
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// Профіль адміністратора
+model AdminProfile {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  accessLevel     String        @default("FULL") // FULL, SUPPORT, MODERATOR
+  logs            AdminLog[]    // Логи дій адміна для безпеки
+}
+
+// -------------------------------------------------------------
+// 2. КАТАЛОГ ТОВАРІВ ТА СТРУКТУРА
+// -------------------------------------------------------------
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique // Українська назва (Електроніка)
+  slug      String    @unique // URL-слаг (electronics)
+  products  Product[]
+}
+
+model Product {
+  id            String        @id @default(cuid())
+  title         String
+  description   String
+  image         Bytes         // 🔥 Зберігаємо головне зображення як бінарні дані (BLOB)
+  images        Bytes[]       // 🔥 Галерея додаткових фото як масив BLOB
+  price         Float         
+  oldPrice      Float?        
+  discount      Int?          
+  isHot         Boolean       @default(false) 
+  soldCount     Int           @default(0)     
+  totalCount    Int           @default(1)     
+  isApproved    Boolean       @default(false) 
+  
+  sellerId      String
+  seller        SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  reviews       Review[]
+  orderItems    OrderItem[]
+  wishlistedBy  WishlistItem[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([sellerId])
+  @@index([categoryId])
+}
+
+
+// -------------------------------------------------------------
+// 3. ЗАМОВЛЕННЯ ТА ТРАНЗАКЦІЇ
+// -------------------------------------------------------------
+
+enum OrderStatus {
+  PENDING     // Очікує оплати
+  PAID        // Оплачено, передано продавцю
+  SHIPPED     // Відправлено службою доставки
+  DELIVERED   // Отримано покупцем (гроші розблокуються продавцю)
+  CANCELLED   // Скасовано
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  status      OrderStatus @default(PENDING)
+  totalAmount Float
+  
+  // Дані доставки
+  shippingAddress String
+  phone           String
+  customerName    String
+  
+  // Зв'язок із покупцем
+  customerId  String
+  customer    User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  items       OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([customerId])
+}
+
+// Позиції всередині замовлення (розділені за продавцями)
+model OrderItem {
+  id        String  @id @default(cuid())
+  quantity  Int     @default(1)
+  price     Float   // Фіксуємо ціну на момент покупки
+  
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// -------------------------------------------------------------
+// 4. ІНТЕРАКТИВ (ОБРАНЕ, ВІДГУКИ, АУДИТ)
+// -------------------------------------------------------------
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      @default(5) // Від 1 до 5 зірок
+  comment   String
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([productId])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId]) // Покупець не може додати один товар двічі
+}
+
+// Фінансові виплати продавцям
+model Payout {
+  id        String        @id @default(cuid())
+  amount    Float
+  status    String        @default("PENDING") // PENDING, APPROVED, REJECTED
+  sellerId  String
+  seller    SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@index([sellerId])
+}
+
+// Аудит дій адміністратора
+model AdminLog {
+  id        String       @id @default(cuid())
+  action    String       // Наприклад: "BAN_USER", "APPROVE_PRODUCT"
+  details   String
+  adminId   String
+  admin     AdminProfile @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@index([adminId])
+}
