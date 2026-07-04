@@ -4,6 +4,7 @@ import Hero from "./components/Hero";
 import HotDeals from "./components/HotDeals";
 import HowItWorks from "./components/HowItWorks";
 import PopularProducts from "./components/PopularProducts";
+export const dynamic = 'force-dynamic';
 
 // 1. ПРОСУНУТІ МЕТАДАНІ ДЛЯ ГОЛОВНОЇ СТОРІНКИ
 export const metadata: Metadata = {

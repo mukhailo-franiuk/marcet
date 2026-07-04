@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma';
 import AdminSidebar from '../componets/AdminSidebar';
 import CategoryManager from './CategoryManager';
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Управління категоріями | Адмін-панель',
