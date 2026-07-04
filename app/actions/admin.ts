@@ -42,19 +42,19 @@ export async function toggleStoreVerification(sellerId: string, currentStatus: b
 // 2. Блокування / Розблокування всього аккаунту продавця
 export async function toggleUserStatus(targetUserId: string, currentActiveStatus: boolean, adminUserId: string) {
   try {
-    await prisma.$transaction(async (tx) => {
-      const updatedUser = await tx.user.update({
+    await prisma.$transaction(async (any) => {
+      const updatedUser = await any.user.update({
         where: { id: targetUserId },
         data: { isActive: !currentActiveStatus }
       });
 
-      const adminProfile = await tx.adminProfile.findUnique({
+      const adminProfile = await any.adminProfile.findUnique({
         where: { userId: adminUserId }
       });
 
       if (!adminProfile) throw new Error("Профіль адміністратора не знайдено");
 
-      await tx.adminLog.create({
+      await any.adminLog.create({
         data: {
           adminId: adminProfile.id,
           action: !currentActiveStatus ? 'UNBAN_USER' : 'BAN_USER',
